@@ -1,7 +1,41 @@
 
 #Schema Name = raw_data
 
-create table raw_option_test 
+create table raw_stocks_amex 
+(
+  symbol  varchar(50),
+  eod   varchar(50),
+  open varchar(50),
+  high varchar(50),
+  low varchar(50),
+  close varchar(50),
+  volume varchar(50)
+  );
+
+create table raw_stocks_nyse 
+(
+  symbol  varchar(50),
+  eod   varchar(50),
+  open varchar(50),
+  high varchar(50),
+  low varchar(50),
+  close varchar(50),
+  volume varchar(50)
+  );
+
+create table raw_stocks_nasdaq 
+(
+  symbol  varchar(50),
+  eod   varchar(50),
+  open varchar(50),
+  high varchar(50),
+  low varchar(50),
+  close varchar(50),
+  volume varchar(50)
+  );
+
+
+create table raw_option 
 (
   symbol  varchar(50),
   eod   varchar(50),
@@ -15,8 +49,11 @@ create table raw_option_test
 
 cat /stocks/raw_data/OPRA_* > option_total.csv
 
+COPY raw_stocks FROM '/stocks/raw_data/AMEX_20140127.txt' DELIMITER ',';
+alter table raw_stocks add column exchange varchar(10);
+update  raw_stocks set exchange = 'AMEX';
 
-COPY raw_option_test FROM '/stocks/raw_data/OPRA/OPRA_total.csv' DELIMITER ',';
+
 
 create table stage_option as 
 select substring(symbol,1,length(symbol)-15) strike_symbol,substring(symbol,length(substring(symbol,1,length(symbol)-15))+3,2)||'/'||substring(symbol,length(substring(symbol,1,length(symbol)-15))+5,2)||'/'||substring(symbol,length(substring(symbol,1,length(symbol)-15))+1,2) EXPIRY_DATE,substring(symbol,length(substring(symbol,1,length(symbol)-15))+7,1) option_type,trim(leading '0' from substring(symbol,length(substring(symbol,1,length(symbol)-15))+8,5))||'.'||substring(symbol,length(substring(symbol,1,length(symbol)-15))+13,3) strike,eod,symbol,open,high,low,close,volume,openint from raw_option;

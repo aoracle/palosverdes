@@ -1,12 +1,25 @@
+
+# Query to get HOT Options  
+# This means when TOTAL option money exchange for that symbol is greater than 10 million on single day
+# TO get for a given Day where eod ='2014-01-23'
+
+select strike_symbol,option_type,eod,trunc((sum(money)*100) / 1000000)||' Million' MONEY_EXCH from stage_option_final_month group by strike_symbol,option_type,eod having sum(money) > 100000 order by eod,sum(money) desc;
+
+
+#This means Return only when INDIVIDUAL Single Option symbol money_exch is greater than 10 Million on that day
+select strike_symbol,option_type,eod,trunc((sum(money)*100) / 1000000)||' Million' MONEY_EXCH from stage_option_final_week where money > 100000 group by strike_symbol,option_type,eod order by eod,sum(money) desc;
+
+
+
 # Analysis of Unusual Stock Options 
 # I found Unsual Money Exchanged for GD when i started digging I found that 245 Millions worth of option got exchanged and most of them were calls on 1/14/2014
 # If you look at Volume on other days its very small except on 1/14/2014
 
-select strike_symbol,option_type,eod,trunc((sum(money)*100) / 1000000)||' Million' MONEY_EXCH from stage_option_final where strike_symbol = 'GD' group by strike_symbol,option_type,eod  order by eod,sum(money) desc;
+select strike_symbol,option_type,eod,trunc((sum(money)*100) / 1000000)||' Million' MONEY_EXCH from stage_option_final_week where strike_symbol = 'GD' group by strike_symbol,option_type,eod  order by eod,sum(money) desc;
 
-select strike_symbol,strike,open,close,option_type,expiry_date,eod,money*100 MONEY_EXCH from stage_option_final where strike_symbol = 'GD' and eod = '2014-01-14' and money > 100 order by eod,money desc; 
+select strike_symbol,strike,open,close,option_type,expiry_date,eod,money*100 MONEY_EXCH from stage_option_final_week where strike_symbol = 'GD' and eod = '2014-01-14' and money > 100 order by eod,money desc; 
 
-select strike_symbol,strike,open,close,option_type,expiry_date,eod,money*100 MONEY_EXCH from stage_option_final where strike_symbol = 'GD' and eod = '2014-01-14' and money > 100 order by eod,money desc; 
+select strike_symbol,strike,open,close,option_type,expiry_date,eod,money*100 MONEY_EXCH from stage_option_final_week where strike_symbol = 'GD' and eod = '2014-01-14' and money > 100 order by eod,money desc; 
 
 
 
