@@ -43,8 +43,13 @@ def zip():
     #else:
     #    continue	
 
-def check_word_type(filename):
-    words = ['AMEX','OPRA','NYSE','NASDAQ'] #I am not sure if adj and adv are variables
+def check_word_type(filename,exchange):
+    words = []
+    if exchange == None:
+      words = ['AMEX','OPRA','NYSE','NASDAQ'] #I am not sure if adj and adv are variables
+    else:
+      words.append(exchange)
+      #print "words : %s " % (words)
     count = 0
     for i in words:
         if i in filename:
@@ -55,7 +60,7 @@ def check_word_type(filename):
     if count == 1:
         return count
 
-def downloadFiles(path,destination):
+def downloadFiles(path,destination,exchange):
 #path & destination are str of the form "/dir/folder/something/"
 #path should be the abs path to the root FOLDER of the file tree to download
     try:
@@ -77,7 +82,8 @@ def downloadFiles(path,destination):
 
     for file in filelist:
         try:
-            if check_word_type(file):
+            if check_word_type(file,exchange):
+                print "File Download : %s" % (file)             
             #this will check if file is folder:
                 ftp.cwd(path+file+"/")
             #if so, explore it:
@@ -169,6 +175,7 @@ def copy_cmd(options, dateobj):
 
 def main(options, args):
 
+
   _date = options.startdate
   print "I am in 1"
   #while _date <= options.enddate:
@@ -182,6 +189,9 @@ def main(options, args):
 
 
 if __name__ == '__main__':
+
+
+
   print "I am in 11"
   parser = OptionParser(version="%prog 1.0")
   parser.add_option('-s', '--startdate', type='string', dest='startdate', help='the start date (format: yyyymmdd)')
@@ -190,7 +200,17 @@ if __name__ == '__main__':
   parser.add_option('--dbhost', type='string', dest='dbhost', default='localhost', help='Postgres host address')
   parser.add_option('--dbname', type='string', dest='dbname', default='raw_stocks', help='db name')
   parser.add_option('--tablename', type='string', dest='tablename', default='raw_option', help='Postgres Table to load')
+  parser.add_option('--exchange', type='string', dest='exchange',default=None, help='NYSE AMEX NASDAQ OPTION')
+  parser.add_option("-f",type="string",dest="function",help="Function to run")
   options, args = parser.parse_args()
+
+  if options.function:
+    print "exchange : %s" % (options.exchange)
+    if options.function == 'downloadFiles':
+      globals()[options.function](source,filepath,options.exchange)
+    #target_conn.commit()
+    sys.exit(0)
+
  ## Process the date args
   if not options.startdate:
    options.startdate = datetime.datetime.today()
