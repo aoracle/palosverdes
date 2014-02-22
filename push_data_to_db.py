@@ -9,6 +9,8 @@ from optparse import OptionParser
 import logging
 import ftplib
 from ftplib import FTP
+import yaml
+
 ftp = ftplib.FTP("ftp.eoddata.com")
 ftp.login("amahajan1981", "gurukul1")
 
@@ -119,7 +121,7 @@ def move_files(status,filename,name):
       if os.path.exists(archivepath)==False:
         os.mkdir(archivepath)
         os.chmod(archivepath, 0755)
-      logger,info("Filepath : %s" % (os.path.join(archivepath,name)))
+      logger.info("Filepath : %s" % (os.path.join(archivepath,name)))
       if os.path.isfile(os.path.join(archivepath,name)):
         os.remove(os.path.join(archivepath,name))
       shutil.move(filename,archivepath)
