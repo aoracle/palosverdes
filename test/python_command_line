@@ -1,0 +1,7 @@
+/stocks/raw_data/OPRA/OPRA_20140120.txt
+
+
+COPY raw_option FROM '/stocks/raw_data/OPRA/OPRA_20140120.txt' DELIMITER ',';
+
+
+subprocess.call(["/usr/local/pgsql/bin/psql", "-d",'mustafa',"-c","COPY raw_option FROM '/stocks/raw_data/OPRA/OPRA_20140120.txt' DELIMITER ',' CSV"])
