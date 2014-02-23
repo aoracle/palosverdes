@@ -9,22 +9,15 @@ from optparse import OptionParser
 import logging
 import ftplib
 from ftplib import FTP
-import yaml
+import yaml   
+from constants import *
+from multiprocessing import Pool
 
-ftp = ftplib.FTP("ftp.eoddata.com")
-ftp.login("amahajan1981", "gurukul1")
 
 
-amex_table = 'raw_stocks_amex'
-nyse_table = 'raw_stocks_nyse'
-nasdaq_table = 'raw_stocks_nasdaq'
-opra_table = 'raw_option'
-filepath = '/stocks/raw_data/test/'
-archivepath = '/stocks/raw_data/test/archive'
-source="/"
-log_dir = '/stocks/raw_data/log/'
-#dest="/stocks/raw_data/"
 
+ftp = ftplib.FTP(ftp_site)
+ftp.login(ftp_username,ftp_password)
 
 
 #SQL = """SELECT d.Date, SUM(d.CostUsd) FROM Stats d WHERE d.Date = '%s' GROUP BY d.Date"""
@@ -86,7 +79,7 @@ def downloadFiles(path,destination,exchange):
 
     #list children:
     filelist=ftp.nlst()
-
+    file_names = []
     for file in filelist:
         try:
             if check_word_type(file,exchange):
@@ -94,6 +87,7 @@ def downloadFiles(path,destination,exchange):
             #this will check if file is folder:
                 ftp.cwd(path+file+"/")
             #if so, explore it:
+                file_names.append(file)
                 downloadFiles(path+file+"/",destination)
         except ftplib.error_perm:
             #not a folder with accessible content
@@ -167,6 +161,8 @@ def copy_cmd(options, dateobj):
    subprocess.call(["psql", "-d",options.dbname,"-c","drop table raw_stocks_nasdaq"])
   
 
+        
+
 
 def init_options():
   parser = OptionParser()
@@ -193,8 +189,8 @@ def main(options):
   if options.download:
     
     logger.debug("I am in 111")
-    logger.info("source : %s , filepath : %s , Options.exchange : %s" % (source,filepath,options.exchange)) 
-    downloadFiles(source,filepath,options.exchange)
+    logger.info("source : %s , filepath : %s , Options.exchange : %s" % (ftp_source,filepath,options.exchange)) 
+    downloadFiles(ftp_source,filepath,options.exchange)
   _date = options.startdate
   create_table()
   rs = copy_cmd(options, _date)
@@ -245,4 +241,4 @@ if __name__ == '__main__':
       globals()[options.function](source,filepath,options.exchange)
     sys.exit(0)
 
-  main(options)#
+  main(options)
