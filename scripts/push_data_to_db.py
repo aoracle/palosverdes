@@ -14,8 +14,6 @@ from constants import *
 from multiprocessing import Pool
 
 
-
-
 ftp = ftplib.FTP(ftp_site)
 ftp.login(ftp_username,ftp_password)
 
@@ -100,6 +98,7 @@ def downloadFiles(path,destination,exchange):
 
 
 
+
 def create_table():
 
   for i in ['raw_stocks_amex','raw_stocks_nyse','raw_stocks_nasdaq','raw_option']:
@@ -121,7 +120,7 @@ def move_files(status,filename,name):
       shutil.move(filename,archivepath)
 
 def copy_cmd(options, dateobj):
-  ret1 = ret2 = ret3 = ret4 = 1
+  ret1 = ret11 = ret2 = ret3 = ret4 = 1
   #create_table
   logger.debug("I am in 112")
   subprocess.call(["psql", "-d",options.dbname,"-c","drop table if exists raw_stocks_all"])
@@ -130,7 +129,7 @@ def copy_cmd(options, dateobj):
   if options.filename == 'NULL':
    for i in os.listdir(filepath):
     #print "I am in 113 File Name : %s" % (i)
-    if i.endswith(".txt"):
+    if i.endswith(".csv") or i.endswith(".txt"):
       filename = filepath + '/' + i
       #for j in exchange:
       #print "Printing J : %s" % (j)
@@ -138,6 +137,7 @@ def copy_cmd(options, dateobj):
       if i.startswith(j[0]):
         logger.info("opra_table : %s  i : %s" % (opra_table,i)) 
         ret1 = subprocess.call(["psql", "-d",options.dbname,"-c","COPY %s FROM '%s' DELIMITER ',' CSV" % (opra_table,filename)])
+        ret11 = subprocess.call(["psql", "-d",options.dbname,"-c","update raw_option set eod = to_char(to_date(eod,'DD-MON-YYYY'),'YYYYMMDD') where length(eod) > 8"])
         move_files(ret1,filename,i)
       elif i.startswith(j[1]):
         ret2 = subprocess.call(["psql", "-d",options.dbname,"-c","COPY %s FROM '%s' DELIMITER ',' CSV" % (nyse_table,filename)])
@@ -156,13 +156,53 @@ def copy_cmd(options, dateobj):
    subprocess.call(["psql", "-d",options.dbname,"-c","alter table %s add column exchange varchar(10)" % (nyse_table)])
    subprocess.call(["psql", "-d",options.dbname,"-c","update  %s set exchange = '%s'" % (nyse_table,j[1])])
    subprocess.call(["psql", "-d",options.dbname,"-c","create table raw_stocks_all as select * from raw_stocks_amex union select * from raw_stocks_nyse union select * from raw_stocks_nasdaq"])
+   subprocess.call(["psql", "-d",options.dbname,"-c","delete from raw_stocks_all where eod = 'Date'"])
+   subprocess.call(["psql", "-d",options.dbname,"-c","delete from raw_option where eod = 'Date'"])
+   subprocess.call(["psql", "-d",options.dbname,"-c","update raw_stocks_all set eod = to_char(to_date(eod,'DD-MON-YYYY'),'YYYYMMDD') where length(eod) > 8"])
+   #update raw_stocks_all set eod = to_char(to_date(eod,'YYYY-MM-DD'),'YYYYMMDD') where length(eod) > 8;
    subprocess.call(["psql", "-d",options.dbname,"-c","drop table raw_stocks_amex"])
    subprocess.call(["psql", "-d",options.dbname,"-c","drop table raw_stocks_nyse"])
    subprocess.call(["psql", "-d",options.dbname,"-c","drop table raw_stocks_nasdaq"])
+   return ret1 + ret11 + ret2 + ret3 + ret4
+
+def create_stage_final_table():
   
+  s1=subprocess.call(["psql", "-d",options.dbname,"-c","drop table if exists stage_option"])
+  
+  create_stage_option_str = "create table stage_option as select substring(symbol,1,length(symbol)-15) strike_symbol,eod,substring(symbol,length(substring(symbol,1,length(symbol)-15))+3,2)||'/'||substring(symbol,length(substring(symbol,1,length(symbol)-15))+5,2)||'/'||substring(symbol,length(substring(symbol,1,length(symbol)-15))+1,2) EXPIRY_DATE,substring(symbol,length(substring(symbol,1,length(symbol)-15))+7,1) option_type,\
+  trim(leading '0' from substring(symbol,length(substring(symbol,1,length(symbol)-15))+8,5))||'.'||substring(symbol,length(substring(symbol,1,length(symbol)-15))+13,3) STRIKE,symbol,open,high,low,close,volume,openint from raw_option"
+  
+  s2=subprocess.call(["psql", "-d",options.dbname,"-c",create_stage_option_str])
+  
+  create_option_str = "create table if not exists options \
+  (id bigserial NOT NULL,strike_symbol varchar(10),expiry_date date,option_type varchar(2),strike numeric,eod date,symbol character varying(50),open numeric,high numeric,low numeric,close numeric,volume int,openint int,money numeric);"
+  
+  s3=subprocess.call(["psql", "-d",options.dbname,"-c",create_option_str])
+  
+  insert_option_str = "insert into options(strike_symbol,expiry_date,option_type,strike,eod,symbol,open,high,low,close,volume,openint,money) \
+  select strike_symbol,to_date(expiry_date,'MM/DD/YY'),option_type,cast(strike as numeric),to_date(eod,'YYYYMMDD'),symbol,cast(open as numeric),cast(high as numeric),cast(low as numeric),cast(close as numeric),cast(volume as int),cast(openint as int),cast(volume as int)*cast(close as numeric) from stage_option" 
+  #where to_date(eod,'YYYYMMDD') > (select coalesce(max(eod),'20050201') from options)"
+  
+  s4=subprocess.call(["psql", "-d",options.dbname,"-c",insert_option_str])
+ 
+  create_table_stocks_str = "create table if not exists stocks( id bigserial NOT NULL,symbol character varying(50),eod date,open numeric,high numeric,low numeric,close numeric,volume int,exchange character varying(50))"
 
-        
+  s5=subprocess.call(["psql", "-d",options.dbname,"-c",create_table_stocks_str])
+ 
+  insert_stocks_str = "insert into stocks(symbol,eod,open,high,low,close,volume,exchange) select symbol,to_date(eod,'YYYYMMDD'),cast(open as numeric),cast(high as numeric),cast(low as numeric),cast(close as numeric),cast(volume as int),exchange from raw_stocks_all" 
+  #where to_date(eod,'YYYYMMDD') > (select coalesce(max(eod),'20050201') from stocks)"
 
+  s6=subprocess.call(["psql", "-d",options.dbname,"-c",insert_stocks_str])
+  return s1 + s2 + s3 + s4 + s5 + s6 
+
+#def validate_data():
+# This will give count of reords 
+  #select count(*) from options;select count(*) from raw_option;select count(*) from raw_stocks_all;select count(*) from stage_option;select count(*) from stocks;
+  #select count(*),eod from options group by eod order by eod;
+  #select count(*),exchange,eod from stocks group by exchange,eod order by exchange,eod;
+
+  #def truncate_table():
+  #truncate table options;truncate table raw_option;truncate table raw_stocks_all;truncate table stage_option;truncate table stocks;
 
 def init_options():
   parser = OptionParser()
@@ -171,7 +211,7 @@ def init_options():
   parser.add_option('-e', '--enddate', type='string', dest='enddate', help='the end date (format: yyyymmdd)')
   parser.add_option('--filename', type='string', dest='filename', default='NULL',help='target directory for output files')
   parser.add_option('--dbhost', type='string', dest='dbhost', default='localhost', help='Postgres host address')
-  parser.add_option('--dbname', type='string', dest='dbname', default='raw_stocks', help='db name')
+  parser.add_option('--dbname', type='string', dest='dbname', default=default_dbname, help='db name')
   parser.add_option('--tablename', type='string', dest='tablename', default='raw_option', help='Postgres Table to load')
   parser.add_option('--exchange', type='string', dest='exchange',default='ALL', help='suppy list as [NYSE AMEX NASDAQ OPTION]')
   parser.add_option("-d",action="store_true",dest="download",default=False,help="Download File before start of run ")
@@ -182,20 +222,24 @@ def init_options():
   return options
 
 def main(options):
-
+  status = 1
   #print "I am in 1"
   logger.debug("I am in 1")
   #while _date <= options.enddate:
   if options.download:
     
-    logger.debug("I am in 111")
+    logger.debug("I am in main.download")
     logger.info("source : %s , filepath : %s , Options.exchange : %s" % (ftp_source,filepath,options.exchange)) 
     downloadFiles(ftp_source,filepath,options.exchange)
   _date = options.startdate
   create_table()
   rs = copy_cmd(options, _date)
-  
-  logger.info("I am in 2")
+  #status = create_stage_final_table()
+  print "printing status : %s " % (status) 
+  print "printing ret status : %s" % (rs)
+  if int(rs) + int(status) == 0:
+    logger.info("Loading Process finished successfully")
+  logger.debug("I am in main")
   _date += datetime.timedelta(days=1)
 
 
@@ -227,18 +271,20 @@ if __name__ == '__main__':
   log_file_name = log_dir + 'push_data_db' + '_' + options.dbname + '_' + log_id + '.log'
   logger = logging.getLogger()
   handler = logging.FileHandler(log_file_name)
-  formatter = logging.Formatter('[%(asctime)s] p%(process)s {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s','%m-%d %H:%M:%S')
+  formatter = logging.Formatter('[%(asctime)s] -%(name)s - p%(process)s {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s','%m-%d %H:%M:%S')
   handler.setFormatter(formatter)
   logger.addHandler(handler) 
   logger.setLevel(levels.get(options.level_name, logging.NOTSET))
   logger.info('Starting....')
   logger.debug('LOG DIR : %s' % log_dir)
-  logger.debug("I am in 11")  
+  logger.debug("I am in __name__.main()")  
 
   if options.function:
     logger.info("exchange : %s" % (options.exchange))
     if options.function == 'downloadFiles':
       globals()[options.function](source,filepath,options.exchange)
+    else:
+      globals()[options.function]()
     sys.exit(0)
 
   main(options)

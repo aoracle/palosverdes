@@ -3,8 +3,6 @@ import psycopg2
 #note that we have to import the Psycopg2 extras library!
 import psycopg2.extras
 import sys
-import os
-
  
 def main():
 	conn_string = "host='localhost' dbname='stocks' user='postgres' password=''"
@@ -29,7 +27,6 @@ def main():
 	# Note that in python you specify a tuple with one item in it by placing
 	# a comma after the first variable and surrounding it in parentheses.
 	cursor.execute('SET work_mem TO %s', (work_mem,))
-	
  
 	# Then we get the work memory we just set -> we know we only want the
 	# first ROW so we call fetchone.
