@@ -204,6 +204,14 @@ def create_stage_final_table():
   #def truncate_table():
   #truncate table options;truncate table raw_option;truncate table raw_stocks_all;truncate table stage_option;truncate table stocks;
 
+#def create_index():
+#CREATE INDEX  idx_options_strike_symbol ON options (strike_symbol);
+#CREATE INDEX  idx_options_strike_symbol ON options (strike_symbol,eod);
+#CREATE INDEX  idx_stocks_symbol ON stocks (symbol);
+#CREATE INDEX  idx_stocks_symbol_eod ON stocks (symbol,eod);
+
+
+
 def init_options():
   parser = OptionParser()
   parser = OptionParser(version="%prog 1.0")
