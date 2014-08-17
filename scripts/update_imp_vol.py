@@ -52,8 +52,7 @@ def createAndStoreimplvol(cursor, database_name):
       """
     cursor.execute(update_impl_sql)
     conn.commit()
-  #cleanup()
-
+  cleanup()
 
 def cleanup():
   """cleanup the file created."""
@@ -61,56 +60,15 @@ def cleanup():
     file_handle.write('')
   return
 
-
-def update_impl(records):
-  for record in records:
-    impl_dict = {}
-    print "   ", record[1],record[2],record[3],record[4],record[5],record[6]
-    if record[6] == 'C':
-      cursor.execute("SELECT * FROM options o where id = %s limit 100" % (record[0]))
-      records = cursor.fetchall()
-      pprint.pprint(records)
-      o_price = black.impliedBlack(record[6],float(record[3]), float(record[4]),float(record[2]/365), 0.003, float(record[5]))      
-
-      #result = cursor.execute("update options_vol_50 set implied_vol = %s where id = %s" % (c_price[0],int(record[0])))
-      conn.commit()
-    elif record[6] == 'P':
-      o_price = black.impliedBlack(record[6],float(record[3]), float(record[4]),float(record[2]/365), 0.003, float(record[5]))
-      #result = cursor.execute("update options_vol_50 set implied_vol = %s where id = %s" % (p_price[0],int(record[0])))
-    #impl_dict[int(record[0]) = o_price[0]
-    #result = cursor.execute("insert into opt_impl_vol_temp(id,impl_val)  set implied_vol = %s where id = %s" % (c_price[0],int(record[0])))
-
-      conn.commit()
-
-
 if __name__ == '__main__':
 
   conn_string = "host='localhost' dbname='finance' user='postgres' password=''"
   print "Connecting to database\n ->%s" % (conn_string)
   # get a connection, if a connect cannot be made an exception will be raised here
   conn = psycopg2.connect(conn_string)
- 
   # conn.cursor will return a cursor object, you can use this cursor to perform queries
   cursor = conn.cursor()
- 
-  # execute our Query
-  ##cursor.execute("SELECT o.id,o.strike_symbol,o.expiry_date - o.eod expiration_time,s.close stock_price,o.strike strike_price,o.close option_price,o.option_type FROM options_vol_50 o, stocks s where o.strike_symbol = s.symbol and o.eod = s.eod")
- 
-  # retrieve the records from the database
-  ##records = cursor.fetchall()
-  #print records
-  #P = list(chunks(records,5))
-  #print 'Printing P : ', P
-  #pool = ThreadPool(1)
-  #results = pool.map(update_impl,P)
-  #pool.close()
-  #pool.join()
-  #update_impl(records)
   createAndStoreimplvol(cursor,'finance')
-  # print out the records using pretty print
-  # note that the NAMES of the columns are not shown, instead just indexes.
-  # for most people this isn't very useful so we'll show you how to return
-  # columns as a dictionary (hash) in the next example.
 
 
 
