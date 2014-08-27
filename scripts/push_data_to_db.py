@@ -12,7 +12,8 @@ from ftplib import FTP
 import yaml   
 from constants import *
 from multiprocessing import Pool
-
+import black
+#from pudb import set_trace 
 
 ftp = ftplib.FTP(ftp_site)
 ftp.login(ftp_username,ftp_password)
@@ -61,12 +62,13 @@ def check_word_type(filename,exchange):
 def downloadFiles(path,destination,exchange):
 #path & destination are str of the form "/dir/folder/something/"
 #path should be the abs path to the root FOLDER of the file tree to download
+    #set_trace()
     try:
         ftp.cwd(path)
         #clone path to destination
         os.chdir(destination)
-        os.mkdir(destination[0:len(destination)-1]+path)
-        logger.info(destination[0:len(destination)-1]+path+" built")
+        #os.mkdir(destination[0:len(destination)]+path)
+        logger.info(destination[0:len(destination)]+path+" built")
     except OSError:
         #folder already exists at destination
         pass
@@ -87,13 +89,17 @@ def downloadFiles(path,destination,exchange):
             #if so, explore it:
                 file_names.append(file)
                 downloadFiles(path+file+"/",destination)
+                print ftplib.error_perm
         except ftplib.error_perm:
             #not a folder with accessible content
             #download & return
             os.chdir(destination[0:len(destination)-1]+path)
             #possibly need a permission exception catch:
-            ftp.retrbinary("RETR "+file, open(os.path.join(destination,file),"wb").write)
+            gFile = open(os.path.join(destination,file),"wb")
+            ftp.retrbinary("RETR "+file,gFile.write)
+            gFile.close()
             logger.info(file + " downloaded")
+    ftp.quit()
     return
 
 
@@ -121,18 +127,14 @@ def move_files(status,filename,name):
 
 def copy_cmd(options, dateobj):
   ret1 = ret11 = ret2 = ret3 = ret4 = 1
-  #create_table
-  logger.debug("I am in 112")
+  logger.debug("I am in copy cmd")
   subprocess.call(["psql", "-d",options.dbname,"-c","drop table if exists raw_stocks_all"])
   subprocess.call(["psql", "-d",options.dbname,"-c","truncate table raw_option"])
   j = ['OPRA','AMEX','NYSE','NASDAQ']
   if options.filename == 'NULL':
    for i in os.listdir(filepath):
-    #print "I am in 113 File Name : %s" % (i)
     if i.endswith(".csv") or i.endswith(".txt"):
       filename = filepath + '/' + i
-      #for j in exchange:
-      #print "Printing J : %s" % (j)
       logger.debug("Printing i : %s" % (i))
       if i.startswith(j[0]):
         logger.info("opra_table : %s  i : %s" % (opra_table,i)) 
@@ -140,12 +142,15 @@ def copy_cmd(options, dateobj):
         ret11 = subprocess.call(["psql", "-d",options.dbname,"-c","update raw_option set eod = to_char(to_date(eod,'DD-MON-YYYY'),'YYYYMMDD') where length(eod) > 8"])
         move_files(ret1,filename,i)
       elif i.startswith(j[1]):
+        logger.info("nyse_table : %s  i : %s" % (nyse_table,i)) 
         ret2 = subprocess.call(["psql", "-d",options.dbname,"-c","COPY %s FROM '%s' DELIMITER ',' CSV" % (nyse_table,filename)])
         move_files(ret2,filename,i)
       elif i.startswith(j[2]):
+        logger.info("nasdaq_table : %s  i : %s" % (nasdaq_table,i)) 
         ret3 = subprocess.call(["psql", "-d",options.dbname,"-c","COPY %s FROM '%s' DELIMITER ',' CSV" % (nasdaq_table,filename)])
         move_files(ret3,filename,i)
       if i.startswith(j[3]):
+        logger.info("amex_table : %s  i : %s" % (amex_table,i)) 
         ret4 = subprocess.call(["psql", "-d",options.dbname,"-c","COPY %s FROM '%s' DELIMITER ',' CSV" % (amex_table,filename)])
         move_files(ret4,filename,i)
   
@@ -159,7 +164,6 @@ def copy_cmd(options, dateobj):
    subprocess.call(["psql", "-d",options.dbname,"-c","delete from raw_stocks_all where eod = 'Date'"])
    subprocess.call(["psql", "-d",options.dbname,"-c","delete from raw_option where eod = 'Date'"])
    subprocess.call(["psql", "-d",options.dbname,"-c","update raw_stocks_all set eod = to_char(to_date(eod,'DD-MON-YYYY'),'YYYYMMDD') where length(eod) > 8"])
-   #update raw_stocks_all set eod = to_char(to_date(eod,'YYYY-MM-DD'),'YYYYMMDD') where length(eod) > 8;
    subprocess.call(["psql", "-d",options.dbname,"-c","drop table raw_stocks_amex"])
    subprocess.call(["psql", "-d",options.dbname,"-c","drop table raw_stocks_nyse"])
    subprocess.call(["psql", "-d",options.dbname,"-c","drop table raw_stocks_nasdaq"])
@@ -181,19 +185,33 @@ def create_stage_final_table():
   
   insert_option_str = "insert into options(strike_symbol,expiry_date,option_type,strike,eod,symbol,open,high,low,close,volume,openint,money) \
   select strike_symbol,to_date(expiry_date,'MM/DD/YY'),option_type,cast(strike as numeric),to_date(eod,'YYYYMMDD'),symbol,cast(open as numeric),cast(high as numeric),cast(low as numeric),cast(close as numeric),cast(volume as int),cast(openint as int),cast(volume as int)*cast(close as numeric) from stage_option" 
-  #where to_date(eod,'YYYYMMDD') > (select coalesce(max(eod),'20050201') from options)"
-  
+
+
   s4=subprocess.call(["psql", "-d",options.dbname,"-c",insert_option_str])
- 
+  
+  insert_option_vol_50 = "insert into options_vol_50(strike_symbol,expiry_date,option_type,strike,eod,symbol,open,high,low,close,volume,openint,money) \
+  select strike_symbol,to_date(expiry_date,'MM/DD/YY'),option_type,cast(strike as numeric),to_date(eod,'YYYYMMDD'),symbol,cast(open as numeric),cast(high as numeric),cast(low as numeric),cast(close as numeric),cast(volume as int),cast(openint as int),cast(volume as int)*cast(close as numeric) from stage_option where cast(volume as int) > 50 and to_date(eod,'YYYYMMDD') > (select max(eod) from options_vol_50)" 
+
+  s7=subprocess.call(["psql", "-d",options.dbname,"-c",insert_option_vol_50])
+
+  insert_option_vol_100 = "insert into options_vol_100(strike_symbol,expiry_date,option_type,strike,eod,symbol,open,high,low,close,volume,openint,money) \
+  select strike_symbol,to_date(expiry_date,'MM/DD/YY'),option_type,cast(strike as numeric),to_date(eod,'YYYYMMDD'),symbol,cast(open as numeric),cast(high as numeric),cast(low as numeric),cast(close as numeric),cast(volume as int),cast(openint as int),cast(volume as int)*cast(close as numeric) from stage_option where cast(volume as int) > 100 and to_date(eod,'YYYYMMDD') > (select max(eod) from options_vol_100)" 
+
+  s8=subprocess.call(["psql", "-d",options.dbname,"-c",insert_option_vol_100])
+
+  insert_option_vol_1000 = "insert into options_vol_1000(strike_symbol,expiry_date,option_type,strike,eod,symbol,open,high,low,close,volume,openint,money) \
+  select strike_symbol,to_date(expiry_date,'MM/DD/YY'),option_type,cast(strike as numeric),to_date(eod,'YYYYMMDD'),symbol,cast(open as numeric),cast(high as numeric),cast(low as numeric),cast(close as numeric),cast(volume as int),cast(openint as int),cast(volume as int)*cast(close as numeric) from stage_option where cast(volume as int) > 1000 and to_date(eod,'YYYYMMDD') > (select max(eod) from options_vol_1000)" 
+
+  s9=subprocess.call(["psql", "-d",options.dbname,"-c",insert_option_vol_1000])
+
   create_table_stocks_str = "create table if not exists stocks( id bigserial NOT NULL,symbol character varying(50),eod date,open numeric,high numeric,low numeric,close numeric,volume int,exchange character varying(50))"
 
   s5=subprocess.call(["psql", "-d",options.dbname,"-c",create_table_stocks_str])
  
   insert_stocks_str = "insert into stocks(symbol,eod,open,high,low,close,volume,exchange) select symbol,to_date(eod,'YYYYMMDD'),cast(open as numeric),cast(high as numeric),cast(low as numeric),cast(close as numeric),cast(volume as int),exchange from raw_stocks_all" 
-  #where to_date(eod,'YYYYMMDD') > (select coalesce(max(eod),'20050201') from stocks)"
 
   s6=subprocess.call(["psql", "-d",options.dbname,"-c",insert_stocks_str])
-  return s1 + s2 + s3 + s4 + s5 + s6 
+  return s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9
 
 #def validate_data():
 # This will give count of reords 
@@ -209,6 +227,31 @@ def create_stage_final_table():
 #CREATE INDEX  idx_options_strike_symbol ON options (strike_symbol,eod);
 #CREATE INDEX  idx_stocks_symbol ON stocks (symbol);
 #CREATE INDEX  idx_stocks_symbol_eod ON stocks (symbol,eod);
+
+
+def Update_implied_volatility():
+  conn_string = "host='localhost' dbname='finance' user='postgres' password=''"
+  print "Connecting to database\n ->%s" % (conn_string)
+  # get a connection, if a connect cannot be made an exception will be raised here
+  conn = psycopg2.connect(conn_string)
+ 
+  # conn.cursor will return a cursor object, you can use this cursor to perform queries
+  cursor = conn.cursor()
+ 
+  # execute our Query
+  cursor.execute("SELECT * FROM finance.option limit 100")
+ 
+  # retrieve the records from the database
+  records = cursor.fetchall()
+ 
+  # print out the records using pretty print
+  # note that the NAMES of the columns are not shown, instead just indexes.
+  # for most people this isn't very useful so we'll show you how to return
+  # columns as a dictionary (hash) in the next example.
+  pprint.pprint(records)
+
+  #p_price = black.impliedBlack('p', '236', 200, 0.123, 0.003, 4.11, comp=inf)
+  #c_price = black.impliedBlack('c', '236', 200, 0.123, 0.003, 4.11, comp=inf)
 
 
 
@@ -231,30 +274,25 @@ def init_options():
 
 def main(options):
   status = 1
-  #print "I am in 1"
-  logger.debug("I am in 1")
-  #while _date <= options.enddate:
+  logger.debug("I am in main")
   if options.download:
-    
     logger.debug("I am in main.download")
     logger.info("source : %s , filepath : %s , Options.exchange : %s" % (ftp_source,filepath,options.exchange)) 
     downloadFiles(ftp_source,filepath,options.exchange)
   _date = options.startdate
   create_table()
   rs = copy_cmd(options, _date)
-  #status = create_stage_final_table()
-  print "printing status : %s " % (status) 
+  status = create_stage_final_table()
   print "printing ret status : %s" % (rs)
+  print "printing status : %s " % (status)
   if int(rs) + int(status) == 0:
     logger.info("Loading Process finished successfully")
-  logger.debug("I am in main")
   _date += datetime.timedelta(days=1)
 
 
 if __name__ == '__main__':
 
   options = init_options() 
- ## Process the date args
   if not options.startdate:
    options.startdate = datetime.datetime.today()
   else:

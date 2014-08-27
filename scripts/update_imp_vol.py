@@ -10,7 +10,7 @@ def chunks(l, n):
   for i in xrange(0, len(l), n):
       yield l[i:i+n]
 
-def createAndStoreimplvol(cursor, database_name):
+def createAndStoreimplvol_50(cursor,vol,database_name):
   """Creates impl_vol and stores them in to a file.
 
   Loads the file in to temporary table.
@@ -18,13 +18,13 @@ def createAndStoreimplvol(cursor, database_name):
     cursor: postgres connection cursor to database.
     database_name: Name of the database.
   """
-  get_distinct_eod = """SELECT distinct eod FROM options_vol_50  where eod > '2014-08-08' order by eod """ 
+  get_distinct_eod = """SELECT distinct eod FROM options_vol_%s  where implied_vol is  null  and strike_symbol  not in ('RVX.XO','BKX.X','XDB.X','MNX.XO','CDD.XI','VXST.XO','NDX.X','STPFQ','DJX.XO','XEO.XO','XAU.X','XDE.X','GVZ.XO','SOX.X','SPXPM.XO','RUT.X','SPX.XO','VIX.XO','OEX.XO','XSP.XO') order by eod """ % (vol)
   cursor.execute(get_distinct_eod)
   get_distinct_eod = cursor.fetchall()
   print get_distinct_eod
   for eod in get_distinct_eod:
     print eod[0]
-    get_imp_vol_sql = """SELECT o.id,o.strike_symbol,o.expiry_date - o.eod expiration_time,s.close stock_price,o.strike strike_price,o.close option_price,o.option_type FROM options_vol_50 o, stocks s where o.strike_symbol = s.symbol and o.eod = s.eod and to_char(o.eod,'YYYY-MM-DD') = '%s'""" % (eod[0])
+    get_imp_vol_sql = """SELECT o.id,o.strike_symbol,o.expiry_date - o.eod expiration_time,s.close stock_price,o.strike strike_price,o.close option_price,o.option_type FROM options_vol_%s o, stocks s where o.strike_symbol = s.symbol and o.eod = s.eod and to_char(o.eod,'YYYY-MM-DD') = '%s'""" % (vol,eod[0])
     print get_imp_vol_sql
     cursor.execute(get_imp_vol_sql)
     with open('/tmp/im_vol.data', 'w+') as file_handle:
@@ -47,12 +47,14 @@ def createAndStoreimplvol(cursor, database_name):
     cursor.execute(create_temp_table_sql)
     load_data_sql = """COPY impl_table FROM '/tmp/im_vol.data' DELIMITER ',' CSV""" 
     cursor.execute(load_data_sql)
-    update_impl_sql = """UPDATE options_vol_50 AS tml SET implied_vol=round(mtmp.impl_vol,2) FROM
+    update_impl_sql = """UPDATE options_vol_%s AS tml SET implied_vol=round(mtmp.impl_vol,2) FROM
        impl_table mtmp where  tml.id=mtmp.id
-      """
+      """ % (vol)
     cursor.execute(update_impl_sql)
     conn.commit()
   cleanup()
+
+
 
 def cleanup():
   """cleanup the file created."""
@@ -68,7 +70,9 @@ if __name__ == '__main__':
   conn = psycopg2.connect(conn_string)
   # conn.cursor will return a cursor object, you can use this cursor to perform queries
   cursor = conn.cursor()
-  createAndStoreimplvol(cursor,'finance')
+  #createAndStoreimplvol_50(cursor,50,'finance')
+  #createAndStoreimplvol_50(cursor,100,'finance')
+  createAndStoreimplvol_50(cursor,1000,'finance')
 
 
 
